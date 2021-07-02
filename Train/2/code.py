@@ -48,7 +48,12 @@ from nltk.stem.porter import PorterStemmer
 import random
 import math
 import time
-
+import string
+import nltk
+nltk.download("stopwords")
+from nltk.corpus import stopwords
+nltk_words = list(stopwords.words('english'))
+nltk_words.extend(list(string.punctuation))
 
 class News_Dataset(Dataset):
 
@@ -157,17 +162,9 @@ def tokenize_en(text):
 
 # fields for processing text data
 # source field
-SRC = Field(tokenize = tokenize_en,
-            init_token = '<sos>',
-            eos_token = '<eos>',
-            fix_length= 100,
-            lower = True)
+#SRC = Field(tokenize = tokenize_en,init_token = '<sos>',eos_token = '<eos>',fix_length= 500,lower = True)
 # target field
-TRG = Field(tokenize = tokenize_en,
-            init_token = '<sos>',
-            eos_token = '<eos>',
-            fix_length= 20,
-            lower = True)
+#TRG = Field(tokenize = tokenize_en,init_token = '<sos>',eos_token = '<eos>',fix_length= 200,lower = True)
 
 # you can set batch_first parameter in Fields to True
 # if you want first dimention to be batch dimension
@@ -176,8 +173,14 @@ TRG = Field(tokenize = tokenize_en,
 
 #ews_data = News_Dataset(path='kaggle/input', fields=[SRC,TRG])
 #fields = [(None, None), (None, None), ('claim',TRG), (None, None),('content', SRC)]
-fields = [(None, None), (None, None), ('trg',TRG), (None, None),('src', SRC)]
-training_data=TabularDataset(path = 'kaggle/news_summary1.csv',format = 'csv',fields = fields,skip_header = True)
+#fields = [(None, None), (None, None), ('trg',TRG), (None, None),('src', SRC)]
+#training_data=TabularDataset(path = 'kaggle/news_summary1.csv',format = 'csv',fields = fields,skip_header = True)
+SRC = Field(tokenize="spacy", lower=True, init_token="<sos>", eos_token="<eos>",stop_words=nltk_words)
+TRG = Field(tokenize="spacy", lower=True, init_token="<sos>", eos_token="<eos>",stop_words=nltk_words)
+fields = [(None, None), (None, None), ('trg',SRC),('src', TRG)]
+
+training_data = TabularDataset(path = "../../Data/Claim_final/finalDataFrame_preprocessed.csv",format = 'tsv',fields = fields,skip_header = True)
+
 train_data, test_data, valid_data = training_data.split(split_ratio=[0.8, 0.1, 0.1])
 
 
@@ -189,8 +192,8 @@ print(f"Number of training examples: {len(train_data.examples)}")
 print(f"Number of validation examples: {len(valid_data.examples)}")
 print(f"Number of testing examples: {len(test_data.examples)}")
 
-SRC.build_vocab(train_data, min_freq = 2,vectors = "glove.6B.300d")
-TRG.build_vocab(train_data, min_freq = 2,vectors = "glove.6B.300d")
+SRC.build_vocab(train_data, min_freq = 2,vectors = "glove.6B.100d")
+TRG.build_vocab(train_data, min_freq = 2,vectors = "glove.6B.100d")
 len(SRC.vocab), len(TRG.vocab)
 
 # TRG.numericalize(news_data.df.loc[1, 'Summaries'])
@@ -211,7 +214,7 @@ print(min(src_len), max(src_len), min(trg_len), max(trg_len))
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-BATCH_SIZE = 100
+BATCH_SIZE = 32
 
 train_iterator, valid_iterator, test_iterator = Iterator.splits(
     (train_data, valid_data, test_data),
@@ -352,14 +355,14 @@ class Seq2Seq(nn.Module):
 
 
 # seq2seq model's config variables
-INPUT_DIM = len(SRC.vocab)
-OUTPUT_DIM = len(TRG.vocab)
+INPUT_DIM = len(SRC.vocab)+20000
+OUTPUT_DIM = len(TRG.vocab)+20000
 #ENC_EMB_DIM = 128
-ENC_EMB_DIM = 300
+ENC_EMB_DIM = 100
 #DEC_EMB_DIM = 128
-DEC_EMB_DIM = 300
-HID_DIM = 256
-N_LAYERS = 2
+DEC_EMB_DIM = 100
+HID_DIM = 64
+N_LAYERS = 1
 ENC_DROPOUT = 0.1
 DEC_DROPOUT = 0.1
 
@@ -513,7 +516,7 @@ class Seq2Seq_trainer(object):
 pad_index = TRG.vocab.stoi[TRG.pad_token]
 # initialize trainer
 trainer = Seq2Seq_trainer(model, train_iterator, valid_iterator, pad_index, device, 1, 1e-3)
-trainer.fit(30)
+trainer.fit(2)
 
 
 # evaluate on test data
