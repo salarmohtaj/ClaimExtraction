@@ -13,21 +13,15 @@ import torch.optim as optim
 import numpy as np
 import pandas as pd
 import spacy, random
-try:
-    from torchtext.data.metrics import bleu_score
-except:
-    from torchtext.legacy.data.metrics import bleu_score
-try:
-    from torchtext.data import Field, BucketIterator, TabularDataset
-except:
-    from torchtext.legacy.data import Field, BucketIterator, TabularDataset
-try:
-    from torchtext import data
-except:
-    from torchtext.legacy import data
+from torchtext.data.metrics import bleu_score
+from torchtext.legacy.data import Field, BucketIterator, TabularDataset
+from torchtext.legacy import data
 import string
 import nltk
-nltk.download("stopwords")
+try:
+    nltk.data.find("corpora/stopwords")
+except:
+    nltk.download("stopwords")
 from nltk.corpus import stopwords
 nltk_words = list(stopwords.words('english'))
 nltk_words.extend(list(string.punctuation))
@@ -35,10 +29,7 @@ nltk_words.extend(list(string.punctuation))
 
 num_epochs = 50
 
-try:
-    spacy_english = spacy.load("en")
-except:
-    spacy_english = spacy.load("en_core_web_sm")
+spacy_english = spacy.load("en_core_web_sm")
 
 content = Field(tokenize="spacy", lower=True, init_token="<sos>", eos_token="<eos>",stop_words=nltk_words)
 #claim = Field(tokenize="spacy", lower=True, init_token="<sos>", eos_token="<eos>")
@@ -248,10 +239,7 @@ print(model)
 
 
 def translate_sentence(model, sentence, content, device, max_length=50):
-    try:
-        spacy_ger = spacy.load("en")
-    except:
-        spacy_ger = spacy.load("en_core_web_sm")
+    spacy_ger = spacy.load("en_core_web_sm")
     if type(sentence) == str:
         tokens = [token.text.lower() for token in spacy_ger(sentence)]
     else:

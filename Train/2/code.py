@@ -27,10 +27,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-try:
-    from torchtext.data import Field, BucketIterator, Example, Dataset, Iterator, TabularDataset
-except:
-    from torchtext.legacy.data import Field, BucketIterator, Example, Dataset, Iterator, TabularDataset
+from torchtext.legacy.data import Field, BucketIterator, Example, Dataset, Iterator, TabularDataset
 from torch.utils.data import DataLoader, random_split
 
 try:
@@ -50,10 +47,18 @@ import math
 import time
 import string
 import nltk
-nltk.download("stopwords")
+
+try:
+    nltk.data.find("corpora/stopwords")
+except:
+    nltk.download("stopwords")
+
 from nltk.corpus import stopwords
 nltk_words = list(stopwords.words('english'))
 nltk_words.extend(list(string.punctuation))
+spacy_en = spacy.load('en_core_web_sm')
+
+
 
 class News_Dataset(Dataset):
 
@@ -151,10 +156,6 @@ class News_Dataset(Dataset):
         return [ps.stem(word) for word in word_list]
 
 
-try:
-    spacy_en = spacy.load('en')
-except:
-    spacy_en = spacy.load('en_core_web_sm')
 
 def tokenize_en(text):
     # spacy tokenizer
@@ -355,8 +356,8 @@ class Seq2Seq(nn.Module):
 
 
 # seq2seq model's config variables
-INPUT_DIM = len(SRC.vocab)+20000
-OUTPUT_DIM = len(TRG.vocab)+20000
+INPUT_DIM = len(SRC.vocab)
+OUTPUT_DIM = len(TRG.vocab)
 #ENC_EMB_DIM = 128
 ENC_EMB_DIM = 100
 #DEC_EMB_DIM = 128
