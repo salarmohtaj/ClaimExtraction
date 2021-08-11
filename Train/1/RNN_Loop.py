@@ -127,12 +127,7 @@ class EncoderLSTM(nn.Module):
         return hidden_state, cell_state
 
 
-encoder_lstm = EncoderLSTM(input_size_encoder, encoder_embedding_size,
-                           hidden_size, num_layers, encoder_dropout).to(device)
-print(encoder_lstm)
-# Initialize the pretrained embedding
-pretrained_content_embeddings = content.vocab.vectors
-encoder_lstm.embedding.weight.data.copy_(pretrained_content_embeddings)
+
 
 class DecoderLSTM(nn.Module):
   def __init__(self, input_size, embedding_size, hidden_size, num_layers, p, output_size):
@@ -189,13 +184,6 @@ class DecoderLSTM(nn.Module):
 
 
 
-decoder_lstm = DecoderLSTM(input_size_decoder, decoder_embedding_size,
-                           hidden_size, num_layers, decoder_dropout, output_size).to(device)
-print(decoder_lstm)
-# Initialize the pretrained embedding
-pretrained_claim_embeddings = claim.vocab.vectors
-decoder_lstm.embedding.weight.data.copy_(pretrained_claim_embeddings)
-
 
 
 class Seq2Seq(nn.Module):
@@ -248,6 +236,21 @@ for decoder_dropout in dropout:
             for learning_rate in learning_rates:
                 decoder_dropout = float(decoder_dropout)
                 encoder_dropout = decoder_dropout
+                encoder_lstm = EncoderLSTM(input_size_encoder, encoder_embedding_size,
+                                           hidden_size, num_layers, encoder_dropout).to(device)
+                # print(encoder_lstm)
+                # Initialize the pretrained embedding
+                pretrained_content_embeddings = content.vocab.vectors
+                encoder_lstm.embedding.weight.data.copy_(pretrained_content_embeddings)
+
+                decoder_lstm = DecoderLSTM(input_size_decoder, decoder_embedding_size,
+                                           hidden_size, num_layers, decoder_dropout, output_size).to(device)
+                print(decoder_lstm)
+                # Initialize the pretrained embedding
+                pretrained_claim_embeddings = claim.vocab.vectors
+                decoder_lstm.embedding.weight.data.copy_(pretrained_claim_embeddings)
+                print(learning_rates, hidden_size, num_layers, decoder_dropout)
+
                 f_results = open("resutls-"+str(learning_rates).replace(".","_")+"-"+str(hidden_size)+"-"+str(num_layers)+"-"+str(decoder_dropout).replace(".","_")+".text",'w')
 
                 step = 0
