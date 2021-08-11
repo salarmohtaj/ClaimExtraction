@@ -30,24 +30,24 @@ nltk_words.extend(list(string.punctuation))
 
 
 
-num_epochs = 50
+num_epochs = 100
 #encoder_embedding_size = 300
 encoder_embedding_size = 100
 #hidden_size = 1024
-hidden_size = 512
+#hidden_size = 512
 #num_layers = 2
-num_layers = 1
-encoder_dropout = float(0.5)
+#num_layers = 1
+#encoder_dropout = float(0.5)
 #decoder_embedding_size = 300
 decoder_embedding_size = 100
 #hidden_size = 1024
-hidden_size = 512
+#hidden_size = 512
 #num_layers = 2
-num_layers = 1
-decoder_dropout = float(0.5)
-learning_rate = 0.001
+#num_layers = 1
 
 spacy_english = spacy.load("en_core_web_sm")
+
+
 
 content = Field(tokenize="spacy", lower=True, init_token="<sos>", eos_token="<eos>",stop_words=nltk_words)
 claim = Field(tokenize="spacy", lower=True, init_token="<sos>", eos_token="<eos>",stop_words=nltk_words)
@@ -65,15 +65,6 @@ claim.build_vocab(train_data, max_size=10000, min_freq=1, vectors = "glove.6B.10
 input_size_encoder = len(content.vocab)
 output_size = len(claim.vocab)
 input_size_decoder = len(claim.vocab)
-
-
-#No. of unique tokens in text
-print(f"Unique tokens in content vocabulary: {len(content.vocab)}")
-print(f"Unique tokens in claim vocabulary: {len(claim.vocab)}")
-#Commonly used words
-print(content.vocab.freqs.most_common(10))
-print(claim.vocab.freqs.most_common(10))
-print(train_data[5].__dict__.keys())
 
 
 
@@ -244,153 +235,168 @@ class Seq2Seq(nn.Module):
         return outputs
 
 
-step = 0
 
-model = Seq2Seq(encoder_lstm, decoder_lstm).to(device)
-optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+decoder_dropout = float(0.5)
+learning_rates = [0.01,0.03,0.001,0.003]
+dropout = [0.25,0.5,0.75,0.9]
+hidden_sizes = [32,64,128,256,512,1024,2048]
+num_layerss = [1,2]
 
-pad_idx = claim.vocab.stoi["<pad>"]
-criterion = nn.CrossEntropyLoss(ignore_index=pad_idx)
-print(model)
+for decoder_dropout in dropout:
+    for num_layers in num_layerss:
+        for hidden_size in hidden_sizes:
+            for learning_rate in learning_rates:
+                decoder_dropout = float(decoder_dropout)
+                encoder_dropout = decoder_dropout
+                f_results = open("resutls-"+str(learning_rates).replace(".","_")+"-"+str(hidden_size)+"-"+str(num_layers)+"-"+str(decoder_dropout).replace(".","_")+".text",'w')
 
-pytorch_total_params = sum(p.numel() for p in model.parameters())
-pytorch_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-print(f'The model has {pytorch_total_params} parameters and {pytorch_trainable_params} trainable parameters')
+                step = 0
 
-def translate_sentence(model, sentence, content, claim, device, max_length=50):
-    spacy_ger = spacy.load("en_core_web_sm")
-    if type(sentence) == str:
-        tokens = [token.text.lower() for token in spacy_ger(sentence)]
-    else:
-        tokens = [token.lower() for token in sentence]
-    tokens.insert(0, content.init_token)
-    tokens.append(content.eos_token)
-    text_to_indices = [content.vocab.stoi[token] for token in tokens]
-    sentence_tensor = torch.LongTensor(text_to_indices).unsqueeze(1).to(device)
+                model = Seq2Seq(encoder_lstm, decoder_lstm).to(device)
+                optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-    # Build encoder hidden, cell state
-    with torch.no_grad():
-        hidden, cell = model.Encoder_LSTM(sentence_tensor)
+                pad_idx = claim.vocab.stoi["<pad>"]
+                criterion = nn.CrossEntropyLoss(ignore_index=pad_idx)
+                pytorch_total_params = sum(p.numel() for p in model.parameters())
+                pytorch_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-    outputs = [claim.vocab.stoi["<sos>"]]
+                def translate_sentence(model, sentence, content, claim, device, max_length=50):
+                    spacy_ger = spacy.load("en_core_web_sm")
+                    if type(sentence) == str:
+                        tokens = [token.text.lower() for token in spacy_ger(sentence)]
+                    else:
+                        tokens = [token.lower() for token in sentence]
+                    tokens.insert(0, content.init_token)
+                    tokens.append(content.eos_token)
+                    text_to_indices = [content.vocab.stoi[token] for token in tokens]
+                    sentence_tensor = torch.LongTensor(text_to_indices).unsqueeze(1).to(device)
 
-    for _ in range(max_length):
-        previous_word = torch.LongTensor([outputs[-1]]).to(device)
+                    # Build encoder hidden, cell state
+                    with torch.no_grad():
+                        hidden, cell = model.Encoder_LSTM(sentence_tensor)
 
-        with torch.no_grad():
-            output, hidden, cell = model.Decoder_LSTM(previous_word, hidden, cell)
-            best_guess = output.argmax(1).item()
+                    outputs = [claim.vocab.stoi["<sos>"]]
 
-        outputs.append(best_guess)
+                    for _ in range(max_length):
+                        previous_word = torch.LongTensor([outputs[-1]]).to(device)
 
-        # Model predicts it's the end of the sentence
-        if output.argmax(1).item() == claim.vocab.stoi["<eos>"]:
-            break
+                        with torch.no_grad():
+                            output, hidden, cell = model.Decoder_LSTM(previous_word, hidden, cell)
+                            best_guess = output.argmax(1).item()
 
-    translated_sentence = [claim.vocab.itos[idx] for idx in outputs]
-    return translated_sentence[1:]
+                        outputs.append(best_guess)
 
-def bleu(data, model, content, claim, device):
-    targets = []
-    outputs = []
+                        # Model predicts it's the end of the sentence
+                        if output.argmax(1).item() == claim.vocab.stoi["<eos>"]:
+                            break
 
-    for example in data:
-        src = vars(example)["content"]
-        trg = vars(example)["claim"]
+                    translated_sentence = [claim.vocab.itos[idx] for idx in outputs]
+                    return translated_sentence[1:]
 
-        prediction = translate_sentence(model, src, content, claim, device)
-        prediction = prediction[:-1]  # remove <eos> token
-        print("==================")
-        print(trg)
-        print(prediction)
-        print("==================")
-        targets.append([trg])
-        outputs.append(prediction)
+                def bleu(data, model, content, claim, device):
+                    targets = []
+                    outputs = []
 
-    return bleu_score(outputs, targets)
+                    for example in data:
+                        src = vars(example)["content"]
+                        trg = vars(example)["claim"]
 
-def checkpoint_and_save(model, best_loss, epoch, optimizer, epoch_loss):
-    print('saving')
-    print()
-    state = {'model': model,'best_loss': best_loss,'epoch': epoch,'rng_state': torch.get_rng_state(), 'optimizer': optimizer.state_dict(),}
-    torch.save(state, 'content/checkpoint-NMT')
-    torch.save(model.state_dict(),'content/checkpoint-NMT-SD')
+                        prediction = translate_sentence(model, src, content, claim, device)
+                        prediction = prediction[:-1]  # remove <eos> token
+                        print("==================")
+                        print(trg)
+                        print(prediction)
+                        print("==================")
+                        targets.append([trg])
+                        outputs.append(prediction)
 
-epoch_loss = 0.0
-best_loss = float("inf")
-best_epoch = -1
-sentence1 = "ein mann in einem blauen hemd steht auf einer leiter und putzt ein fenster"
-ts1 = []
+                    return bleu_score(outputs, targets)
 
-for epoch in range(num_epochs):
-    print("Epoch - {} / {}".format(epoch + 1, num_epochs))
-    model.train()
-    #translated_sentence1 = translate_sentence(model, sentence1, german, english, device, max_length=50)
-    #print(f"Translated example sentence 1: \n {translated_sentence1}")
-    #ts1.append(translated_sentence1)
-    train_loss = 0.0
-    #model.train(True)
-    for batch_idx, batch in enumerate(train_iterator):
-        input = batch.content.to(device)
-        target = batch.claim.to(device)
+                def checkpoint_and_save(model, best_loss, epoch, optimizer, epoch_loss):
+                    print('saving')
+                    print()
+                    state = {'model': model,'best_loss': best_loss,'epoch': epoch,'rng_state': torch.get_rng_state(), 'optimizer': optimizer.state_dict(),}
+                    torch.save(state, 'content/checkpoint-NMT')
+                    torch.save(model.state_dict(),'content/checkpoint-NMT-SD')
 
-        # Pass the input and target for model's forward method
-        output = model(input, target)
-        output = output[1:].reshape(-1, output.shape[2])
-        target = target[1:].reshape(-1)
+                epoch_loss = 0.0
+                best_loss = float("inf")
+                best_epoch = -1
+                sentence1 = "ein mann in einem blauen hemd steht auf einer leiter und putzt ein fenster"
+                ts1 = []
 
-        # Clear the accumulating gradients
-        optimizer.zero_grad()
+                for epoch in range(num_epochs):
+                    print("Epoch - {} / {}".format(epoch + 1, num_epochs))
+                    model.train()
+                    #translated_sentence1 = translate_sentence(model, sentence1, german, english, device, max_length=50)
+                    #print(f"Translated example sentence 1: \n {translated_sentence1}")
+                    #ts1.append(translated_sentence1)
+                    train_loss = 0.0
+                    #model.train(True)
+                    for batch_idx, batch in enumerate(train_iterator):
+                        input = batch.content.to(device)
+                        target = batch.claim.to(device)
 
-        # Calculate the loss value for every epoch
-        loss = criterion(output, target)
+                        # Pass the input and target for model's forward method
+                        output = model(input, target)
+                        output = output[1:].reshape(-1, output.shape[2])
+                        target = target[1:].reshape(-1)
 
-        # Calculate the gradients for weights & biases using back-propagation
-        loss.backward()
+                        # Clear the accumulating gradients
+                        optimizer.zero_grad()
 
-        # Clip the gradient value is it exceeds > 1
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1)
+                        # Calculate the loss value for every epoch
+                        loss = criterion(output, target)
 
-        # Update the weights values using the gradients we calculated using bp
-        optimizer.step()
-        step += 1
-        train_loss += loss.item()
+                        # Calculate the gradients for weights & biases using back-propagation
+                        loss.backward()
 
-    model.eval()
-    valid_loss = 0
-    with torch.no_grad():
-        for batch_idx, batch in enumerate(valid_iterator):
-            input = batch.content.to(device)
-            target = batch.claim.to(device)
+                        # Clip the gradient value is it exceeds > 1
+                        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1)
 
-            # Pass the input and target for model's forward method
-            output = model(input, target)
-            output = output[1:].reshape(-1, output.shape[2])
-            target = target[1:].reshape(-1)
+                        # Update the weights values using the gradients we calculated using bp
+                        optimizer.step()
+                        step += 1
+                        train_loss += loss.item()
 
-            # Clear the accumulating gradients
-            optimizer.zero_grad()
+                    model.eval()
+                    valid_loss = 0
+                    with torch.no_grad():
+                        for batch_idx, batch in enumerate(valid_iterator):
+                            input = batch.content.to(device)
+                            target = batch.claim.to(device)
 
-            # Calculate the loss value for every epoch
-            loss = criterion(output, target)
+                            # Pass the input and target for model's forward method
+                            output = model(input, target)
+                            output = output[1:].reshape(-1, output.shape[2])
+                            target = target[1:].reshape(-1)
 
-            # Update the weights values using the gradients we calculated using bp
-            valid_loss += loss.item()
+                            # Clear the accumulating gradients
+                            optimizer.zero_grad()
 
-    train_loss = train_loss / len(train_iterator)
-    valid_loss = valid_loss / len(valid_iterator)
+                            # Calculate the loss value for every epoch
+                            loss = criterion(output, target)
 
-    if valid_loss < best_loss:
-        best_loss = valid_loss
-        best_epoch = epoch
-        checkpoint_and_save(model, best_loss, epoch, optimizer, valid_loss)
-    if ((epoch - best_epoch) >= 10):
-        print("no improvement in 10 epochs, break")
-        break
-    print("Train_Loss - {}".format(train_loss))
-    print("Validation_Loss - {}".format(valid_loss))
-    print()
+                            # Update the weights values using the gradients we calculated using bp
+                            valid_loss += loss.item()
 
-print(epoch_loss / len(train_iterator))
+                    train_loss = train_loss / len(train_iterator)
+                    valid_loss = valid_loss / len(valid_iterator)
+
+                    if valid_loss < best_loss:
+                        best_loss = valid_loss
+                        best_epoch = epoch
+                        checkpoint_and_save(model, best_loss, epoch, optimizer, valid_loss)
+                    if ((epoch - best_epoch) >= 10):
+                        print("no improvement in 10 epochs, break")
+                        break
+                    f_results.write("Train_Loss\t"+str(train_loss))
+                    f_results.write("Validation_Loss\t" + str(valid_loss))
+                    #print("Train_Loss - {}".format(train_loss))
+                    #print("Validation_Loss - {}".format(valid_loss))
+                    #print()
+                f_results.close()
+
+#print(epoch_loss / len(train_iterator))
 #score = bleu(test_data[1:100], model, content, claim, device)
 #print(f"Bleu score {score * 100:.2f}")
