@@ -23,12 +23,14 @@ try:
     nltk.data.find("corpora/stopwords")
 except:
     nltk.download("stopwords")
+
 from nltk.corpus import stopwords
 nltk_words = list(stopwords.words('english'))
 nltk_words.extend(list(string.punctuation))
 
-num_epochs = 50
 
+
+num_epochs = 50
 #encoder_embedding_size = 300
 encoder_embedding_size = 100
 #hidden_size = 1024
@@ -44,6 +46,7 @@ hidden_size = 512
 num_layers = 1
 decoder_dropout = float(0.5)
 spacy_english = spacy.load("en_core_web_sm")
+
 content = Field(tokenize="spacy", lower=True, init_token="<sos>", eos_token="<eos>",stop_words=nltk_words)
 claim = Field(tokenize="spacy", lower=True, init_token="<sos>", eos_token="<eos>",stop_words=nltk_words)
 fields = [(None, None), (None, None), ('claim',claim),('content', content)]
@@ -57,8 +60,8 @@ input_size_encoder = len(content.vocab)
 output_size = len(claim.vocab)
 input_size_decoder = len(claim.vocab)
 
-#No. of unique tokens in text
 
+#No. of unique tokens in text
 print(f"Unique tokens in content vocabulary: {len(content.vocab)}")
 print(f"Unique tokens in claim vocabulary: {len(claim.vocab)}")
 #Commonly used words
@@ -201,6 +204,7 @@ decoder_lstm.embedding.weight.data.copy_(pretrained_claim_embeddings)
 class Seq2Seq(nn.Module):
     def __init__(self, Encoder_LSTM, Decoder_LSTM):
         super(Seq2Seq, self).__init__()
+
         self.Encoder_LSTM = Encoder_LSTM
         self.Decoder_LSTM = Decoder_LSTM
 
