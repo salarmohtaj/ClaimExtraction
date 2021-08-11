@@ -35,7 +35,7 @@ content = Field(tokenize="spacy", lower=True, init_token="<sos>", eos_token="<eo
 #claim = Field(tokenize="spacy", lower=True, init_token="<sos>", eos_token="<eos>")
 fields = [(None, None), (None, None), ('claim',content),('content', content)]
 
-training_data=TabularDataset(path = 'data/finalDataFrame_preprocessed.csv',format = 'tsv',fields = fields, skip_header = True)
+training_data=TabularDataset(path = 'data/finalDataFrame.csv',format = 'tsv',fields = fields, skip_header = True)
 train_data, test_data, valid_data = training_data.split(split_ratio=[0.8, 0.1, 0.1])
 #content.build_vocab(train_data, max_size=10000, min_freq=3, vectors = "glove.6B.100d")
 content.build_vocab(train_data, max_size=10000, min_freq=1, vectors = "glove.6B.100d")
